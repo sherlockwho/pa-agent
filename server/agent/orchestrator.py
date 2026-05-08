@@ -20,9 +20,22 @@ from server.storage.entity_store import EntityStore
 from server.storage.memory_store import MemoryStore
 from server.storage.task_store import TaskStore
 
+_SYSTEM_PROMPT_TEMPLATE = """\
+你是 Rory 的个人 AI 工作助理。Rory 从事 LED 封装工程，日常工作涉及工艺规格制定、共晶/固晶/焊线工艺、支架与荧光粉选型、供应商（荣创、聚能、博睿等）沟通、品质管理（推力测试、光衰验证、可靠性测试）、客户跟进及内部任务/日程管理。
 
-SYSTEM_PROMPT = """你是 Rory 的个人本地工作助理，主要协助 LED 封装工程、工艺文档、质量管理、供应商沟通、日程和任务管理。
-回答使用中文，技术术语可以中英混用。你可以使用已注册工具创建任务、创建日程、检索知识库和查询实体；工具已执行时，请基于工具结果给出简洁确认或总结。"""
+当前时间：{now}
+
+【行为准则】
+- 回答使用中文，专业术语可中英混用（如 LOP、ESD、Vf、CCT）
+- 技术问题给出具体、可操作的建议，不泛泛而谈
+- 工具调用成功后，用一句话确认结果，不重复列出参数
+- 不确定时主动说明局限，不编造数据
+- 对话中提到的人名、公司、产品，记住并在后续回答中保持一致
+
+【可用工具】创建任务、创建日程、检索知识库、查询实体"""
+
+# Intents that never need tool calls — skip the tool-decision LLM call
+_NO_TOOL_INTENTS = {"general_qa", "chitchat", "email_draft"}
 
 
 class Orchestrator:
@@ -57,17 +70,19 @@ class Orchestrator:
         self.memory.append(session_id, user_message)
         self.conversations.append("user", message, session_id=session_id)
 
-        if self.llm.settings.api_key:
-            intent = await self.planner.classify_intent_with_llm(message, self.llm)
-        else:
-            intent = self.planner.classify_intent(message)
-        local_context = self._build_local_context(intent, message)
+        # Always use fast keyword intent — saves one LLM call per message
+        intent = self.planner.classify_intent(message)
+        system_prompt = self._build_system_prompt(intent, message)
         messages = [
-            ChatMessage(role="system", content=f"{SYSTEM_PROMPT}\n\n当前意图分类：{intent}\n\n{local_context}"),
+            ChatMessage(role="system", content=system_prompt),
             *self.memory.get(session_id),
         ]
 
-        tool_results = await self._run_tools_if_needed(message, messages)
+        # Skip tool decision for intents that never need tools
+        tool_results: list[ToolResult] = []
+        if intent not in _NO_TOOL_INTENTS:
+            tool_results = await self._run_tools_if_needed(message, messages)
+
         if tool_results:
             assistant_text = self._summarize_tool_results(tool_results)
             self.memory.append(session_id, ChatMessage(role="assistant", content=assistant_text))
@@ -93,6 +108,16 @@ class Orchestrator:
             session_id=session_id,
             tools_called=[],
         )
+
+    # ------------------------------------------------------------------ #
+    # System prompt construction                                           #
+    # ------------------------------------------------------------------ #
+
+    def _build_system_prompt(self, intent: str, message: str) -> str:
+        now = datetime.now().strftime("%Y年%m月%d日 %H:%M  周" + "一二三四五六日"[datetime.now().weekday()])
+        base = _SYSTEM_PROMPT_TEMPLATE.format(now=now)
+        context = self._build_local_context(intent, message)
+        return f"{base}\n\n{context}"
 
     # ------------------------------------------------------------------ #
     # Post-processing (runs after all tokens are streamed)                 #
@@ -206,29 +231,87 @@ class Orchestrator:
         lines = []
         for result in results:
             if result.result.get("error"):
-                lines.append(f"{result.name} 执行失败：{result.result['error']}")
+                lines.append(f"操作失败：{result.result['error']}")
                 continue
             if result.name == "create_task":
-                lines.append(f"已创建任务：{result.result.get('title')}")
+                due = f"，截止 {result.result['due_date']}" if result.result.get("due_date") else ""
+                lines.append(f"已创建任务「{result.result.get('title')}」{due}。")
             elif result.name == "create_calendar_event":
-                lines.append(f"已创建日程：{result.result.get('title')}，时间 {result.result.get('start_time')}")
+                start = result.result.get("start_time", "")[:16].replace("T", " ")
+                lines.append(f"已添加日程「{result.result.get('title')}」，时间 {start}。")
             elif result.name == "search_knowledge_base":
                 items = result.result.get("results", [])
                 if not items:
-                    lines.append("本地知识库没有检索到相关片段。")
+                    lines.append("知识库中未找到相关内容。")
                 else:
-                    lines.append("本地知识库检索结果：")
-                    for index, item in enumerate(items[:5], start=1):
+                    lines.append("知识库检索结果：")
+                    for idx, item in enumerate(items[:5], 1):
                         chunk = item.get("chunk", {})
-                        lines.append(
-                            f"{index}. {chunk.get('source_file')}#{chunk.get('position')}: "
-                            f"{chunk.get('text', '')[:160]}"
-                        )
+                        lines.append(f"{idx}. [{chunk.get('source_file')}] {chunk.get('text', '')[:200]}")
             elif result.name == "query_entity":
-                lines.append("实体查询完成：" + json.dumps(result.result, ensure_ascii=False))
+                lines.append("实体信息：" + json.dumps(result.result, ensure_ascii=False))
             else:
-                lines.append(f"{result.name} 执行完成。")
+                lines.append(f"{result.name} 已完成。")
         return "\n".join(lines)
+
+    # ------------------------------------------------------------------ #
+    # Context builder                                                      #
+    # ------------------------------------------------------------------ #
+
+    def _build_local_context(self, intent: str, message: str) -> str:
+        sections: list[str] = []
+
+        # Always include brief task + calendar snapshot for grounding
+        if self.task_store:
+            tasks = self.task_store.list()
+            todo = [t for t in tasks if t.status in ("todo", "doing")][:8]
+            if todo:
+                lines = ["【待办任务】"]
+                for t in todo:
+                    due = f" (截止 {t.due_date})" if t.due_date else ""
+                    lines.append(f"- [{t.status}] {t.title}{due}")
+                sections.append("\n".join(lines))
+
+        if self.calendar_store:
+            now = datetime.now()
+            upcoming = [
+                e for e in self.calendar_store.list()
+                if e.start_time >= now
+            ][:5]
+            if upcoming:
+                lines = ["【近期日程】"]
+                for e in upcoming:
+                    lines.append(f"- {e.start_time.strftime('%m/%d %H:%M')} {e.title}")
+                sections.append("\n".join(lines))
+
+        # Intent-specific context
+        if intent == "doc_search" and self.document_retriever:
+            results = self.document_retriever.search(message)
+            if results:
+                lines = ["【知识库检索】"]
+                for idx, r in enumerate(results, 1):
+                    lines.append(
+                        f"{idx}. {r.chunk.source_file}#{r.chunk.position} "
+                        f"(score={r.score:.2f}): {r.chunk.text[:300]}"
+                    )
+                sections.append("\n".join(lines))
+
+        if intent == "entity_query" and self.entity_store:
+            lines = ["【实体库摘要】"]
+            for etype in ["person", "company", "project", "product"]:
+                entities = self.entity_store.list(etype)[:6]
+                if entities:
+                    lines.append(f"- {etype}: " + "、".join(e.name for e in entities))
+            if len(lines) > 1:
+                sections.append("\n".join(lines))
+
+        # Long-term memory narrative
+        if self.long_term_memory:
+            narrative = self.long_term_memory.build_context(days=3)
+            if narrative and narrative != "没有额外本地上下文。":
+                sections.append(f"【近期记忆摘要】\n{narrative}")
+
+        return "\n\n".join(sections) if sections else ""
 
     # ------------------------------------------------------------------ #
     # Intent helpers                                                       #
@@ -264,6 +347,8 @@ class Orchestrator:
             return today.isoformat()
         if "明天" in text:
             return (today + timedelta(days=1)).isoformat()
+        if "后天" in text:
+            return (today + timedelta(days=2)).isoformat()
         return None
 
     def _extract_datetime(self, text: str) -> str | None:
@@ -283,51 +368,5 @@ class Orchestrator:
 
     def _strip_datetime_text(self, text: str) -> str:
         text = re.sub(r"\d{4}-\d{1,2}-\d{1,2}[ T日]*(\d{1,2}(:|点)\d{0,2})?", "", text)
-        text = re.sub(r"(今天|明天)?\s*\d{1,2}(:|点)\d{0,2}", "", text)
+        text = re.sub(r"(今天|明天|后天)?\s*\d{1,2}(:|点)\d{0,2}", "", text)
         return text.strip(" ，,。")
-
-    def _build_local_context(self, intent: str, message: str) -> str:
-        if intent == "doc_search" and self.document_retriever:
-            results = self.document_retriever.search(message)
-            if not results:
-                return "本地知识库暂未检索到相关片段。"
-            lines = ["本地知识库检索结果："]
-            for index, result in enumerate(results, start=1):
-                lines.append(
-                    f"{index}. {result.chunk.source_file}#{result.chunk.position} "
-                    f"(score={result.score:.2f}): {result.chunk.text[:300]}"
-                )
-            return "\n".join(lines)
-
-        if intent == "task_query" and self.task_store:
-            tasks = self.task_store.list()
-            if not tasks:
-                return "当前本地任务列表为空。"
-            lines = ["本地任务摘要："]
-            for task in tasks[:20]:
-                due = f"，截止 {task.due_date}" if task.due_date else ""
-                lines.append(f"- [{task.status}] {task.title}{due}")
-            return "\n".join(lines)
-
-        if intent == "calendar_query" and self.calendar_store:
-            events = self.calendar_store.list()
-            if not events:
-                return "当前默认日历没有事件。"
-            lines = ["默认日历近期事件："]
-            for event in events[:20]:
-                lines.append(f"- {event.start_time.isoformat()} {event.title}")
-            return "\n".join(lines)
-
-        if intent == "entity_query" and self.entity_store:
-            lines = ["本地实体摘要："]
-            for entity_type in ["person", "company", "project", "product"]:
-                entities = self.entity_store.list(entity_type)[:10]
-                if entities:
-                    names = "、".join(entity.name for entity in entities)
-                    lines.append(f"- {entity_type}: {names}")
-            return "\n".join(lines) if len(lines) > 1 else "当前本地实体库为空。"
-
-        if self.long_term_memory:
-            return self.long_term_memory.build_context(days=3)
-
-        return "没有额外本地上下文。"

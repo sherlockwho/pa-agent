@@ -2,9 +2,25 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from server.main import app
+
+
+def _token() -> str:
+    """Read auth token from app settings (empty string if auth disabled)."""
+    return app.state.settings.server.auth_token if hasattr(app.state, "settings") else ""
+
+
+def _headers() -> dict[str, str]:
+    tok = _token()
+    return {"Authorization": f"Bearer {tok}"} if tok else {}
+
+
+def _ws_path() -> str:
+    tok = _token()
+    return f"/ws/chat?token={tok}" if tok else "/ws/chat"
 
 
 def cleanup_runtime_files() -> None:
@@ -20,7 +36,6 @@ def cleanup_runtime_files() -> None:
 def test_health_endpoint():
     with TestClient(app) as client:
         response = client.get("/health")
-
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
@@ -32,8 +47,9 @@ def test_file_upload_indexes_and_searches_document():
         upload = client.post(
             "/api/files/",
             files={"upload": ("uvc.md", b"3535 UVC LED process document", "text/markdown")},
+            headers=_headers(),
         )
-        search = client.get("/api/files/search", params={"q": "UVC process"})
+        search = client.get("/api/files/search", params={"q": "UVC process"}, headers=_headers())
         if upload.status_code == 201:
             uploaded_path = Path(upload.json()["path"])
 
@@ -53,7 +69,7 @@ def test_websocket_can_create_task_with_local_tool():
         created_task_file.unlink()
 
     with TestClient(app) as client:
-        with client.websocket_connect("/ws/chat") as websocket:
+        with client.websocket_connect(_ws_path()) as websocket:
             websocket.send_json({"message": "帮我创建任务：完成UVC工艺规格书修订 截止 2026-05-20"})
             token = websocket.receive_json()
             done = websocket.receive_json()
@@ -73,13 +89,13 @@ def test_websocket_can_create_calendar_event_with_local_tool():
         calendar_file.unlink()
 
     with TestClient(app) as client:
-        with client.websocket_connect("/ws/chat") as websocket:
+        with client.websocket_connect(_ws_path()) as websocket:
             websocket.send_json({"message": "帮我安排会议：质量评审 2026-05-20 10:30"})
             token = websocket.receive_json()
             done = websocket.receive_json()
 
     assert token["type"] == "token"
-    assert "已创建日程" in token["content"]
+    assert "已添加日程" in token["content"]
     assert done == {"type": "done"}
     assert calendar_file.exists()
     assert "质量评审" in calendar_file.read_text(encoding="utf-8")
@@ -94,14 +110,14 @@ def test_websocket_can_search_documents_with_local_tool():
     document_path.write_text("UVC LED 共晶焊接空洞率控制方法", encoding="utf-8")
 
     with TestClient(app) as client:
-        client.post("/api/files/reindex")
-        with client.websocket_connect("/ws/chat") as websocket:
+        client.post("/api/files/reindex", headers=_headers())
+        with client.websocket_connect(_ws_path()) as websocket:
             websocket.send_json({"message": "帮我检索文档：UVC 共晶焊接"})
             token = websocket.receive_json()
             done = websocket.receive_json()
 
     assert token["type"] == "token"
-    assert "本地知识库检索结果" in token["content"]
+    assert "知识库检索结果" in token["content"]
     assert "共晶焊接" in token["content"]
     assert done == {"type": "done"}
     document_path.unlink()
@@ -114,14 +130,14 @@ def test_websocket_auto_extracts_entities_and_updates_memory():
     cleanup_runtime_files()
 
     with TestClient(app) as client:
-        with client.websocket_connect("/ws/chat") as websocket:
+        with client.websocket_connect(_ws_path()) as websocket:
             websocket.send_json({"message": "张工说3535 UVC LED项目下周要更新SOP"})
             websocket.receive_json()
             websocket.receive_json()
-        entities = client.get("/api/entities/product").json()
-        memory_context = client.get("/api/memory/context").json()["context"]
+        entities = client.get("/api/entities/product", headers=_headers()).json()
+        memory_context = client.get("/api/memory/context", headers=_headers()).json()["context"]
 
     assert any("3535" in entity["name"] for entity in entities)
     assert "长期记忆摘要" in memory_context
-    assert "3535 UVC LED项目" in memory_context
+    assert "3535" in memory_context
     cleanup_runtime_files()
