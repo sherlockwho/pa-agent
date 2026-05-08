@@ -4,7 +4,7 @@
 set -e
 
 REPO_DIR="/root/pa-agent"
-GITHUB_REPO="https://github.com/YOUR_USERNAME/YOUR_REPO.git"  # ← 改成你的仓库地址
+GITHUB_REPO="git@github.com:sherlockwho/pa-agent.git"
 
 echo "=== [1/7] 添加 swap (2GB) ==="
 if [ ! -f /swapfile ]; then
