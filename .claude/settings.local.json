@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter clean *)",
+      "Bash(.venv/bin/pip uninstall *)",
+      "Bash(/opt/anaconda3/envs/pa-agent/bin/pip list *)",
+      "Bash(/opt/anaconda3/envs/pa-agent/bin/python -c ' *)",
+      "Bash(grep -v \"^$\")",
+      "Bash(echo \"Exit: $?\")",
+      "Bash(/opt/anaconda3/envs/pa-agent/bin/pip install *)",
+      "Bash(/opt/anaconda3/envs/pa-agent/bin/pip show *)",
+      "Bash(chmod +x \"/Users/rory/Documents/New project/start.sh\")"
+    ]
+  }
+}

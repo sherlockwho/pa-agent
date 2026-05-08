@@ -1,0 +1,34 @@
+server:
+  host: "127.0.0.1"
+  port: 8000
+  auth_token: "your-secret-token"
+
+llm:
+  provider: "deepseek"
+  api_key: ""                         # 填入 DeepSeek API Key
+  base_url: "https://api.deepseek.com"
+  model_chat: "deepseek-chat"
+  model_reasoner: "deepseek-reasoner"
+  temperature: 0.7
+  max_tokens: 4096
+
+embedding:
+  model: "BAAI/bge-small-zh-v1.5"
+  device: "cpu"
+  batch_size: 32
+
+rag:
+  chunk_size: 512
+  chunk_overlap: 64
+  top_k: 5
+
+entity:
+  auto_extract: true
+  merge_threshold: 0.85
+
+memory:
+  max_short_term_messages: 50
+  daily_summary_trigger: 20
+  weekly_summary_day: "sunday"
+
+data_dir: "./data"

@@ -1,0 +1,1 @@
+"""Pluggable assistant skills."""

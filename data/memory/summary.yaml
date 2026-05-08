@@ -1,0 +1,12 @@
+updated_at: '2026-05-08T20:17:10.697187+08:00'
+days_summarized: 1
+recent_highlights:
+- 帮我创建任务：完成UVC工艺规格书修订 截止 2026-05-20
+- 清除现在所有的人任务和日程以及实体
+- 帮我删除我现在所有的任务
+top_tools:
+  create_calendar_event: 1
+  create_task: 1
+  query_calendar_events: 1
+  query_tasks: 1
+top_entities: {}

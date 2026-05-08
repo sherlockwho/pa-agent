@@ -1,0 +1,17 @@
+date: '2026-05-08'
+message_count: 24
+user_message_count: 15
+assistant_message_count: 9
+tools_called:
+- create_calendar_event
+- create_task
+- query_calendar_events
+- query_tasks
+entities_mentioned: []
+highlights:
+- 帮我创建任务：完成UVC工艺规格书修订 截止 2026-05-20
+- 清除现在所有的人任务和日程以及实体
+- 帮我删除我现在所有的任务
+- 删除任务
+narrative: 已删除所有任务和日程。
+updated_at: '2026-05-08T20:17:10.690294+08:00'

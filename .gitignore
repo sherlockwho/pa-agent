@@ -1,0 +1,16 @@
+.venv/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+*.lock
+
+# Local secrets and runtime data
+.env
+config.yaml
+data/**/*.json
+data/**/*.jsonl
+data/**/*.ics
+data/**/*.md
+data/**/*.faiss
+data/**/*.pkl
+!data/**/.gitkeep
