@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class SettingsService {
   static const _keyServerUrl = 'server_url';
   static const _keyAuthToken = 'auth_token';
-  static const _defaultUrl = 'http://192.168.0.198:8000';
+  static const _defaultUrl = 'https://api.cleverboy.fun:8443';
 
   static SettingsService? _instance;
   late SharedPreferences _prefs;

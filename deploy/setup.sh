@@ -65,6 +65,7 @@ echo "   nano $REPO_DIR/config.yaml   # 填入 API Key 和 Token"
 echo ""
 echo "2. 申请 SSL 证书："
 echo "   certbot --nginx -d api.cleverboy.fun --non-interactive --agree-tos -m your@email.com"
+
 echo ""
 echo "3. 启动服务："
 echo "   systemctl start pa-agent"
