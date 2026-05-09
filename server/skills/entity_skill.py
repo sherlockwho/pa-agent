@@ -83,7 +83,7 @@ class EntitySkill(BaseSkill):
                 "type": "function",
                 "function": {
                     "name": "delete_entity",
-                    "description": "删除指定实体",
+                    "description": "删除指定实体（按 ID）",
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -94,6 +94,24 @@ class EntitySkill(BaseSkill):
                             "id": {"type": "string"},
                         },
                         "required": ["entity_type", "id"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "delete_entity_by_name",
+                    "description": "按名称删除实体，不需要知道 ID",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string"},
+                            "entity_type": {
+                                "type": "string",
+                                "enum": ["person", "company", "project", "product"],
+                            },
+                        },
+                        "required": ["name"],
                     },
                 },
             },
@@ -130,5 +148,18 @@ class EntitySkill(BaseSkill):
             entity_id = parameters["id"]
             ok = self.store.delete(entity_type, entity_id)
             return {"deleted": ok}
+
+        if tool_name == "delete_entity_by_name":
+            name = parameters["name"]
+            entity_type = parameters.get("entity_type")
+            search_types = [entity_type] if entity_type else ["person", "company", "project", "product"]
+            deleted_names: list[str] = []
+            for etype in search_types:
+                entity = self.store.find_by_name(etype, name)
+                if entity and self.store.delete(etype, entity.id):
+                    deleted_names.append(entity.name)
+            if deleted_names:
+                return {"deleted": True, "names": deleted_names}
+            return {"deleted": False, "error": f"未找到名为「{name}」的实体"}
 
         return {"error": "unknown_tool"}

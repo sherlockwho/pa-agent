@@ -37,10 +37,14 @@ _KEYWORD_RULES: list[tuple[str, list[str], list[str]]] = [
         "搜索文档", "检索文档", "查找文档", "知识库", "规格书", "sop",
         "datasheet", "查一下资料", "有没有资料", "工艺文件",
     ], []),
+    ("entity_delete", [
+        "删除实体", "移除实体", "删掉这个人", "删掉这家公司", "删掉这个项目", "删掉这个产品",
+        "删除联系人", "删除供应商", "把这个人删掉", "把这家公司删掉",
+    ], []),
     ("entity_query", [
         "告诉我关于", "这个人", "这家公司", "这个项目", "这个产品",
         "荣创", "聚能", "博睿", "供应商信息",
-    ], ["任务", "日程", "创建", "新增"]),
+    ], ["任务", "日程", "创建", "新增", "删除", "移除"]),
     ("general_qa", [
         "怎么", "如何", "为什么", "什么是", "解释", "分析", "建议",
         "共晶", "固晶", "焊线", "推力", "光衰", "可靠性", "esd", "vf",
@@ -52,7 +56,7 @@ _VALID_INTENTS = {
     "calendar_create", "calendar_query", "calendar_delete",
     "task_create", "task_update", "task_query", "task_delete",
     "email_read", "email_draft",
-    "doc_search", "entity_query",
+    "doc_search", "entity_query", "entity_delete",
     "general_qa", "chitchat",
 }
 

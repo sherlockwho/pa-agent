@@ -221,6 +221,12 @@ class Orchestrator:
             calls.append(ToolCall("delete_all_calendar_events", {}))
             return calls
 
+        if self._looks_like_entity_delete(normalized):
+            name = self._extract_entity_delete_name(normalized)
+            if name:
+                calls.append(ToolCall("delete_entity_by_name", {"name": name}))
+                return calls
+
         if self._looks_like_doc_search(normalized):
             query = self._extract_after_keywords(normalized, ["搜索", "检索", "查找", "查询"])
             calls.append(ToolCall("search_knowledge_base", {"query": query or normalized, "top_k": 5}))
@@ -269,8 +275,13 @@ class Orchestrator:
                 lines.append(f"已删除 {count} 个日程。")
             elif result.name == "update_entity":
                 lines.append(f"实体「{result.result.get('name', '')}」已更新。")
-            elif result.name == "delete_entity":
-                lines.append("实体已删除。" if result.result.get("deleted") else "未找到该实体。")
+            elif result.name in ("delete_entity", "delete_entity_by_name"):
+                if result.result.get("deleted"):
+                    names = result.result.get("names", [])
+                    label = "、".join(f"「{n}」" for n in names) if names else "实体"
+                    lines.append(f"{label}已删除。")
+                else:
+                    lines.append(result.result.get("error") or "未找到该实体。")
             elif result.name == "search_knowledge_base":
                 items = result.result.get("results", [])
                 if not items:
@@ -358,6 +369,16 @@ class Orchestrator:
         return any(w in text for w in ["删除", "清除", "清空", "移除"]) and any(
             w in text for w in ["所有日程", "全部日程", "所有会议", "全部会议"]
         )
+
+    def _looks_like_entity_delete(self, text: str) -> bool:
+        return any(w in text for w in ["删除", "移除", "删掉"]) and any(
+            w in text for w in ["实体", "联系人", "供应商", "这个人", "这家公司", "这个项目", "这个产品"]
+        )
+
+    def _extract_entity_delete_name(self, text: str) -> str:
+        # "删除实体：张工" / "删掉供应商荣创" / "把张工这个人删掉"
+        text = re.sub(r"(删除|移除|删掉|把|这个人|这家公司|这个项目|这个产品|实体|联系人|供应商|：|:)", " ", text)
+        return text.strip()
 
     def _looks_like_task_create(self, text: str) -> bool:
         return any(w in text for w in ["创建", "新增", "添加", "记录", "建"]) and any(
