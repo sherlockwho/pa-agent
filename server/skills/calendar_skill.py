@@ -66,7 +66,33 @@ class CalendarSkill(BaseSkill):
                         "required": ["id"],
                     },
                 },
-            }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "delete_calendar_event",
+                    "description": "删除指定日程事件（按 ID）",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "calendar": {"type": "string", "default": "default"},
+                        },
+                        "required": ["id"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "delete_all_calendar_events",
+                    "description": "删除日历中所有日程事件",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"calendar": {"type": "string", "default": "default"}},
+                    },
+                },
+            },
         ]
 
     async def execute(self, tool_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
@@ -81,4 +107,10 @@ class CalendarSkill(BaseSkill):
             calendar = parameters.pop("calendar", "default")
             event = self.store.update(event_id, CalendarEventUpdate.model_validate(parameters), calendar_name=calendar)
             return event.model_dump(mode="json") if event else {"error": "event_not_found"}
+        if tool_name == "delete_calendar_event":
+            ok = self.store.delete(parameters["id"], calendar_name=parameters.get("calendar", "default"))
+            return {"deleted": ok}
+        if tool_name == "delete_all_calendar_events":
+            count = self.store.delete_all(calendar_name=parameters.get("calendar", "default"))
+            return {"deleted_count": count}
         return {"error": "unknown_tool"}

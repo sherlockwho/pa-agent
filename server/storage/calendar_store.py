@@ -63,6 +63,18 @@ class CalendarStore:
             return updated
         return None
 
+    def delete_all(self, calendar_name: str = "default") -> int:
+        path = self._path(calendar_name)
+        if not path.exists():
+            return 0
+        calendar = self._load_calendar(path)
+        count = sum(1 for c in calendar.subcomponents if c.name == "VEVENT")
+        empty = Calendar()
+        empty.add("prodid", "-//Personal AI Work Assistant//local//")
+        empty.add("version", "2.0")
+        self.file_store.write_bytes(path, empty.to_ical())
+        return count
+
     def delete(self, event_id: str, calendar_name: str = "default") -> bool:
         path = self._path(calendar_name)
         if not path.exists():

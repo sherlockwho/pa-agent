@@ -58,6 +58,45 @@ class EntitySkill(BaseSkill):
                     },
                 },
             },
+            {
+                "type": "function",
+                "function": {
+                    "name": "update_entity",
+                    "description": "更新实体的属性、标签或备注",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "entity_type": {
+                                "type": "string",
+                                "enum": ["person", "company", "project", "product"],
+                            },
+                            "id": {"type": "string"},
+                            "name": {"type": "string"},
+                            "tags": {"type": "array", "items": {"type": "string"}},
+                            "notes": {"type": "string"},
+                        },
+                        "required": ["entity_type", "id"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "delete_entity",
+                    "description": "删除指定实体",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "entity_type": {
+                                "type": "string",
+                                "enum": ["person", "company", "project", "product"],
+                            },
+                            "id": {"type": "string"},
+                        },
+                        "required": ["entity_type", "id"],
+                    },
+                },
+            },
         ]
 
     async def execute(self, tool_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
@@ -78,5 +117,18 @@ class EntitySkill(BaseSkill):
             entity_type = parameters.pop("entity_type")
             entity = self.store.create(entity_type, EntityCreate.model_validate(parameters))
             return entity.model_dump(mode="json")
+
+        if tool_name == "update_entity":
+            entity_type = parameters.pop("entity_type")
+            entity_id = parameters.pop("id")
+            updates: dict[str, Any] = {k: v for k, v in parameters.items() if v is not None}
+            entity = self.store.update(entity_type, entity_id, updates)
+            return entity.model_dump(mode="json") if entity else {"error": "entity_not_found"}
+
+        if tool_name == "delete_entity":
+            entity_type = parameters.pop("entity_type")
+            entity_id = parameters["id"]
+            ok = self.store.delete(entity_type, entity_id)
+            return {"deleted": ok}
 
         return {"error": "unknown_tool"}

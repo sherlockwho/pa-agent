@@ -217,6 +217,10 @@ class Orchestrator:
                 )
                 return calls
 
+        if self._looks_like_calendar_delete_all(normalized):
+            calls.append(ToolCall("delete_all_calendar_events", {}))
+            return calls
+
         if self._looks_like_doc_search(normalized):
             query = self._extract_after_keywords(normalized, ["搜索", "检索", "查找", "查询"])
             calls.append(ToolCall("search_knowledge_base", {"query": query or normalized, "top_k": 5}))
@@ -251,14 +255,22 @@ class Orchestrator:
             elif result.name == "create_calendar_event":
                 start = result.result.get("start_time", "")[:16].replace("T", " ")
                 lines.append(f"已添加日程「{result.result.get('title')}」，时间 {start}。")
+            elif result.name == "update_task":
+                lines.append(f"任务已更新：{result.result.get('title', '')}。")
             elif result.name == "delete_task":
-                if result.result.get("deleted"):
-                    lines.append("任务已删除。")
-                else:
-                    lines.append("未找到该任务。")
+                lines.append("任务已删除。" if result.result.get("deleted") else "未找到该任务。")
             elif result.name == "delete_all_tasks":
                 count = result.result.get("deleted_count", 0)
                 lines.append(f"已删除 {count} 个任务。")
+            elif result.name == "delete_calendar_event":
+                lines.append("日程已删除。" if result.result.get("deleted") else "未找到该日程。")
+            elif result.name == "delete_all_calendar_events":
+                count = result.result.get("deleted_count", 0)
+                lines.append(f"已删除 {count} 个日程。")
+            elif result.name == "update_entity":
+                lines.append(f"实体「{result.result.get('name', '')}」已更新。")
+            elif result.name == "delete_entity":
+                lines.append("实体已删除。" if result.result.get("deleted") else "未找到该实体。")
             elif result.name == "search_knowledge_base":
                 items = result.result.get("results", [])
                 if not items:
@@ -340,6 +352,11 @@ class Orchestrator:
     def _looks_like_task_delete_all(self, text: str) -> bool:
         return any(w in text for w in ["删除", "清除", "清空", "移除"]) and any(
             w in text for w in ["所有任务", "全部任务", "所有待办", "全部待办", "所有已完成", "全部已完成"]
+        )
+
+    def _looks_like_calendar_delete_all(self, text: str) -> bool:
+        return any(w in text for w in ["删除", "清除", "清空", "移除"]) and any(
+            w in text for w in ["所有日程", "全部日程", "所有会议", "全部会议"]
         )
 
     def _looks_like_task_create(self, text: str) -> bool:

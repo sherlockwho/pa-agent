@@ -50,6 +50,24 @@ class TaskSkill(BaseSkill):
             {
                 "type": "function",
                 "function": {
+                    "name": "update_task",
+                    "description": "更新任务状态或信息",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "status": {"type": "string", "enum": ["todo", "doing", "done"]},
+                            "title": {"type": "string"},
+                            "due_date": {"type": "string"},
+                            "notes": {"type": "string"},
+                        },
+                        "required": ["id"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
                     "name": "delete_task",
                     "description": "删除指定任务（按 ID）",
                     "parameters": {
