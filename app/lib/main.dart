@@ -68,6 +68,8 @@ class _HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<_HomeShell> {
   int _index = 0;
+  ChatProvider? _chat;
+  bool _wasSending = false;
 
   static const _screens = [
     ChatScreen(),
@@ -76,6 +78,34 @@ class _HomeShellState extends State<_HomeShell> {
     EntityBrowser(),
     SettingsScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadAll();
+      _chat = context.read<ChatProvider>();
+      _chat!.addListener(_onChatChange);
+    });
+  }
+
+  void _onChatChange() {
+    final sending = _chat!.sending;
+    if (_wasSending && !sending) _loadAll();
+    _wasSending = sending;
+  }
+
+  void _loadAll() {
+    context.read<TaskProvider>().load();
+    context.read<CalendarProvider>().load();
+    context.read<EntityProvider>().loadAll();
+  }
+
+  @override
+  void dispose() {
+    _chat?.removeListener(_onChatChange);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

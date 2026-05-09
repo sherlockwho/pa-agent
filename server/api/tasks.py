@@ -30,3 +30,18 @@ def update_task(task_id: str, payload: TaskUpdate, store: TaskStore = Depends(ge
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
+
+
+@router.delete("/{task_id}", status_code=204)
+def delete_task(task_id: str, store: TaskStore = Depends(get_task_store)) -> None:
+    deleted = store.delete(task_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+
+@router.delete("/", status_code=204)
+def delete_all_tasks(
+    status: str | None = Query(default=None),
+    store: TaskStore = Depends(get_task_store),
+) -> None:
+    store.delete_all(status=status)

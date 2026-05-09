@@ -87,9 +87,12 @@ class _EntityBrowserState extends State<EntityBrowser>
             controller: _tabs,
             children: List.generate(
               _types.length,
-              (i) => _EntityList(
-                entities: provider.entitiesOf(_types[i]),
-                emptyLabel: _labels[i],
+              (i) => RefreshIndicator(
+                onRefresh: provider.loadAll,
+                child: _EntityList(
+                  entities: provider.entitiesOf(_types[i]),
+                  emptyLabel: _labels[i],
+                ),
               ),
             ),
           );
@@ -125,9 +128,10 @@ class _EntityList extends StatelessWidget {
       );
     }
     return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(vertical: 8),
       itemCount: entities.length,
-      separatorBuilder: (_,_) => const Divider(indent: 16, endIndent: 16),
+      separatorBuilder: (_, _) => const Divider(indent: 16, endIndent: 16),
       itemBuilder: (_, i) => _EntityTile(entity: entities[i]),
     );
   }

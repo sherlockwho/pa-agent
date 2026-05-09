@@ -36,4 +36,9 @@ class EntityProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<void> deleteEntity(String type, String id) async {
+    await _api.deleteEntity(type, id);
+    await loadAll();
+  }
 }

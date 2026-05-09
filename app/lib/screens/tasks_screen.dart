@@ -79,6 +79,7 @@ class _TasksScreenState extends State<TasksScreen> {
           return RefreshIndicator(
             onRefresh: provider.load,
             child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.symmetric(vertical: 8),
               children: [
                 if (provider.doingTasks.isNotEmpty) ...[

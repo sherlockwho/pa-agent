@@ -81,6 +81,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
           return RefreshIndicator(
             onRefresh: provider.load,
             child: ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.symmetric(vertical: 8),
               itemCount: events.length,
               itemBuilder: (_, i) => _EventTile(event: events[i]),

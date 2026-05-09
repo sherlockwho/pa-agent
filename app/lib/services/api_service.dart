@@ -33,6 +33,19 @@ class ApiService {
     return Task.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
   }
 
+  Future<void> deleteTask(String id) async {
+    final res = await http.delete(_uri('/api/tasks/$id'), headers: _settings.httpHeaders);
+    _check(res);
+  }
+
+  Future<void> deleteAllTasks({String? status}) async {
+    final uri = _uri('/api/tasks/').replace(
+      queryParameters: status != null ? {'status': status} : null,
+    );
+    final res = await http.delete(uri, headers: _settings.httpHeaders);
+    _check(res);
+  }
+
   // ── Calendar ──────────────────────────────────────────────────────────
   Future<List<CalendarEvent>> fetchEvents() async {
     final res = await http.get(_uri('/api/calendar/'), headers: _settings.httpHeaders);
@@ -69,6 +82,11 @@ class ApiService {
     _check(res);
     final list = jsonDecode(res.body) as List;
     return list.map((e) => Entity.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  Future<void> deleteEntity(String type, String id) async {
+    final res = await http.delete(_uri('/api/entities/$type/$id'), headers: _settings.httpHeaders);
+    _check(res);
   }
 
   // ── Health ────────────────────────────────────────────────────────────
