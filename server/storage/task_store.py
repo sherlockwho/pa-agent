@@ -40,6 +40,29 @@ class TaskStore:
         self._write_file(payload.project, records)
         return record
 
+    def delete(self, task_id: str) -> bool:
+        for path in sorted((self.file_store.data_dir / "tasks").glob("*.md")):
+            project = path.stem
+            records = self._read_file(path)
+            new_records = [r for r in records if r.id != task_id]
+            if len(new_records) < len(records):
+                self._write_file(project, new_records)
+                return True
+        return False
+
+    def delete_all(self, status: str | None = None) -> int:
+        count = 0
+        for path in sorted((self.file_store.data_dir / "tasks").glob("*.md")):
+            project = path.stem
+            records = self._read_file(path)
+            if status:
+                new_records = [r for r in records if r.status != status]
+            else:
+                new_records = []
+            count += len(records) - len(new_records)
+            self._write_file(project, new_records)
+        return count
+
     def update(self, task_id: str, payload: TaskUpdate) -> TaskRecord | None:
         for path in sorted((self.file_store.data_dir / "tasks").glob("*.md")):
             project = path.stem

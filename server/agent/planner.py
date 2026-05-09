@@ -20,6 +20,10 @@ _KEYWORD_RULES: list[tuple[str, list[str], list[str]]] = [
     ("task_update", [
         "完成任务", "标记完成", "任务完成", "关闭任务", "更新任务", "任务状态",
     ], []),
+    ("task_delete", [
+        "删除任务", "删除所有任务", "删除全部任务", "清除任务", "清空任务",
+        "删除所有待办", "删除已完成任务", "清除已完成",
+    ], []),
     ("task_query", [
         "任务列表", "查任务", "有哪些任务", "待办", "todo", "还有什么任务",
     ], ["创建", "新增", "添加"]),
@@ -42,7 +46,7 @@ _KEYWORD_RULES: list[tuple[str, list[str], list[str]]] = [
 
 _VALID_INTENTS = {
     "calendar_create", "calendar_query",
-    "task_create", "task_update", "task_query",
+    "task_create", "task_update", "task_query", "task_delete",
     "email_read", "email_draft",
     "doc_search", "entity_query",
     "general_qa", "chitchat",

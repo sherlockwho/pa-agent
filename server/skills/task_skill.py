@@ -46,7 +46,32 @@ class TaskSkill(BaseSkill):
                         },
                     },
                 },
-            }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "delete_task",
+                    "description": "删除指定任务（按 ID）",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"id": {"type": "string"}},
+                        "required": ["id"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "delete_all_tasks",
+                    "description": "删除所有任务，可按状态过滤",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "status": {"type": "string", "enum": ["todo", "doing", "done"]},
+                        },
+                    },
+                },
+            },
         ]
 
     async def execute(self, tool_name: str, parameters: dict[str, Any]) -> dict[str, Any]:
@@ -60,4 +85,10 @@ class TaskSkill(BaseSkill):
         if tool_name == "query_tasks":
             tasks = self.store.list(project=parameters.get("project"), status=parameters.get("status"))
             return {"tasks": [task.model_dump(mode="json") for task in tasks]}
+        if tool_name == "delete_task":
+            ok = self.store.delete(parameters["id"])
+            return {"deleted": ok}
+        if tool_name == "delete_all_tasks":
+            count = self.store.delete_all(status=parameters.get("status"))
+            return {"deleted_count": count}
         return {"error": "unknown_tool"}

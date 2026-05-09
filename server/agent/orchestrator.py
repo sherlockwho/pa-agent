@@ -173,12 +173,24 @@ class Orchestrator:
         normalized = message.strip()
         calls: list[ToolCall] = []
 
+        if self._looks_like_task_delete_all(normalized):
+            status = None
+            if "已完成" in normalized or "完成的" in normalized:
+                status = "done"
+            elif "待办" in normalized and "删除" in normalized:
+                status = "todo"
+            params: dict[str, Any] = {}
+            if status:
+                params["status"] = status
+            calls.append(ToolCall("delete_all_tasks", params))
+            return calls
+
         if self._looks_like_task_create(normalized):
             title = self._extract_after_keywords(normalized, ["任务", "待办"])
             title = re.sub(r"^(创建|新增|添加|帮我|请|一个|一条|：|:|\s)+", "", title).strip()
             title = re.sub(r"(截止|due)[:：]?\s*\d{4}-\d{1,2}-\d{1,2}.*$", "", title, flags=re.IGNORECASE).strip()
             if title:
-                params: dict[str, Any] = {"title": title}
+                params = {"title": title}
                 due_date = self._extract_date(normalized)
                 if due_date:
                     params["due_date"] = due_date
@@ -239,6 +251,14 @@ class Orchestrator:
             elif result.name == "create_calendar_event":
                 start = result.result.get("start_time", "")[:16].replace("T", " ")
                 lines.append(f"已添加日程「{result.result.get('title')}」，时间 {start}。")
+            elif result.name == "delete_task":
+                if result.result.get("deleted"):
+                    lines.append("任务已删除。")
+                else:
+                    lines.append("未找到该任务。")
+            elif result.name == "delete_all_tasks":
+                count = result.result.get("deleted_count", 0)
+                lines.append(f"已删除 {count} 个任务。")
             elif result.name == "search_knowledge_base":
                 items = result.result.get("results", [])
                 if not items:
@@ -316,6 +336,11 @@ class Orchestrator:
     # ------------------------------------------------------------------ #
     # Intent helpers                                                       #
     # ------------------------------------------------------------------ #
+
+    def _looks_like_task_delete_all(self, text: str) -> bool:
+        return any(w in text for w in ["删除", "清除", "清空", "移除"]) and any(
+            w in text for w in ["所有任务", "全部任务", "所有待办", "全部待办", "所有已完成", "全部已完成"]
+        )
 
     def _looks_like_task_create(self, text: str) -> bool:
         return any(w in text for w in ["创建", "新增", "添加", "记录", "建"]) and any(
